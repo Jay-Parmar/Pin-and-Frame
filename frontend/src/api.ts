@@ -35,6 +35,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   const response = await fetch(`/api/v1/${path}`, {
     method,
     credentials: 'same-origin',
+    cache: 'no-store',
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
     signal,
