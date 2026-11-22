@@ -1,9 +1,16 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.test import Client, TestCase
+
+from config.auth import SIGN_IN_ATTEMPT_LIMIT, SIGN_IN_CACHE_KEY, SIGN_IN_WINDOW_SECONDS
 
 
 class OwnerSessionTests(TestCase):
     def setUp(self):
+        cache.delete(SIGN_IN_CACHE_KEY)
+        self.addCleanup(cache.delete, SIGN_IN_CACHE_KEY)
         self.browser = Client(enforce_csrf_checks=True)
         self.password = "test-owner-login"
         get_user_model().objects.create_superuser(username="owner", password=self.password)
@@ -42,6 +49,31 @@ class OwnerSessionTests(TestCase):
             token,
         )
         self.assertEqual(response.status_code, 401)
+
+    def test_sign_in_stops_checking_passwords_after_attempt_limit(self):
+        self.browser.get("/api/v1/session/")
+        token = self.browser.cookies["csrftoken"].value
+        credentials = {"username": "owner", "password": "incorrect"}
+        url = "/api/v1/session/login/"
+        with patch("config.auth.authenticate", return_value=None) as authenticate:
+            for _ in range(SIGN_IN_ATTEMPT_LIMIT):
+                self.assertEqual(self.post(url, credentials, token).status_code, 401)
+            response = self.post(url, credentials, token)
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response["Retry-After"], str(SIGN_IN_WINDOW_SECONDS))
+        self.assertEqual(authenticate.call_count, SIGN_IN_ATTEMPT_LIMIT)
+
+    def test_successful_sign_in_clears_the_attempts(self):
+        cache.set(SIGN_IN_CACHE_KEY, SIGN_IN_ATTEMPT_LIMIT - 1, SIGN_IN_WINDOW_SECONDS)
+        self.browser.get("/api/v1/session/")
+        token = self.browser.cookies["csrftoken"].value
+        response = self.post(
+            "/api/v1/session/login/",
+            {"username": "owner", "password": self.password},
+            token,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(cache.get(SIGN_IN_CACHE_KEY))
 
 
 class PrivateApiTests(TestCase):
