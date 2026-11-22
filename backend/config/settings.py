@@ -11,6 +11,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "rest_framework",
+    "catalog",
 ]
 
 MIDDLEWARE = [
@@ -37,7 +38,9 @@ DATABASES = {
 }
 
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
+    },
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
@@ -48,9 +51,13 @@ TIME_ZONE = "UTC"
 USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-MEDIA_ROOT = Path(
-    os.environ.get("PINFRAME_MEDIA_ROOT", Path.home() / ".pin-and-frame" / "media")
-).expanduser().resolve()
+MEDIA_ROOT = (
+    Path(
+        os.environ.get("PINFRAME_MEDIA_ROOT", Path.home() / ".pin-and-frame" / "media")
+    )
+    .expanduser()
+    .resolve()
+)
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
