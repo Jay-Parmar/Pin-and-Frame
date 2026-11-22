@@ -82,6 +82,21 @@ class DeviceImportTests(TestCase):
             {ImportItem.Result.IMPORTED, ImportItem.Result.FAILED},
         )
 
+    def test_imports_a_heic_original(self):
+        exif = Image.Exif()
+        exif[36867] = "2025:05:03 11:00:00"
+        with Image.new("RGB", (320, 240), "green") as image:
+            image.save(self.source / "sample.heic", format="HEIF", exif=exif)
+
+        run = self.import_source()
+        item = run.items.get()
+        self.assertEqual(item.result, ImportItem.Result.IMPORTED)
+        self.assertEqual(item.photo.captured_on, date(2025, 5, 3))
+        with Image.open(self.media / item.photo.display_key) as display:
+            self.assertEqual(display.format, "WEBP")
+            self.assertEqual(display.size, (320, 240))
+            self.assertFalse(display.getexif())
+
     def test_date_window_skips_known_dates_and_keeps_missing_dates_for_review(self):
         self.write_photo()
         with Image.new("RGB", (200, 100), "blue") as image:
