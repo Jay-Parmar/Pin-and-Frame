@@ -79,7 +79,7 @@ input:not([type="checkbox"]), select { width: 100%; min-width: 0; min-height: 2.
 
 .map-frame { position: relative; min-height: 22rem; background: #e8e9de; border-radius: .75rem; overflow: hidden; }
 .map-picker { min-height: 17rem; }
-.map-canvas { position: absolute; inset: 0; }
+.map-frame > .map-canvas { position: absolute; inset: 0; }
 .map-picker .maplibregl-canvas { cursor: crosshair; }
 .map-notice { position: absolute; inset: auto 1rem 1rem; width: fit-content; max-width: calc(100% - 2rem); padding: .7rem .9rem; color: var(--ink); background: var(--surface); border-radius: .55rem; border: 1px solid var(--border); }
 .map-pin { display: grid; place-items: center; min-width: 2rem; min-height: 2rem; padding: .12rem .35rem; border-radius: 100%; border: 2px solid var(--surface); color: #fff; background: var(--pine); box-shadow: 0 2px 8px #192b2666; font-weight: 700; }
