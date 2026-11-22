@@ -142,6 +142,4 @@ def photo_media(request, photo_id, variant):
     except FileNotFoundError as error:
         raise NotFound("This photo copy is missing.") from error
 
-    response = FileResponse(file, content_type="image/webp", filename=f"{variant}.webp")
-    response["Cache-Control"] = "private, no-store"
-    return response
+    return FileResponse(file, content_type="image/webp", filename=f"{variant}.webp")

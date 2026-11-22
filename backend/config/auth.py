@@ -2,7 +2,6 @@ import json
 
 from django.contrib.auth import authenticate, login, logout
 from django.http import JsonResponse
-from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 from rest_framework.permissions import BasePermission
@@ -26,14 +25,12 @@ def session_data(request):
 
 
 @require_GET
-@never_cache
 @ensure_csrf_cookie
 def session(request):
     return JsonResponse(session_data(request))
 
 
 @require_POST
-@never_cache
 @csrf_protect
 def sign_in(request):
     try:
@@ -58,7 +55,6 @@ def sign_in(request):
 
 
 @require_POST
-@never_cache
 @csrf_protect
 def sign_out(request):
     logout(request)

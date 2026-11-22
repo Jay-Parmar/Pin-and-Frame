@@ -218,6 +218,7 @@ class CatalogTests(TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response["Content-Type"], "image/webp")
             self.assertIn("no-store", response["Cache-Control"])
+            self.assertEqual(response["Cross-Origin-Resource-Policy"], "same-origin")
             self.assertEqual(
                 self.api.get(f"/api/v1/photos/{self.photo.id}/display/").status_code,
                 404,
