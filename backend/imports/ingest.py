@@ -66,13 +66,15 @@ def ingest_item(run, item, start, end):
         return record(run, item, ImportItem.Result.SKIPPED, item.issue)
     if item.open_file is None:
         return record(run, item, ImportItem.Result.FAILED, item.issue)
-    if outside_window(source_day(run, item), start, end):
+    if run.source == ImportRun.Source.INSTAGRAM and outside_window(source_day(run, item), start, end):
         return record(run, item, ImportItem.Result.SKIPPED, "Outside the date window.")
 
     try:
         content, checksum = copy_source(item.open_file)
         with content, open_image(content) as image:
-            item = with_file_metadata(item, image)
+            item = with_file_metadata(
+                item, image, use_matching_local_date=run.source == ImportRun.Source.TAKEOUT
+            )
             day = source_day(run, item)
             if outside_window(day, start, end):
                 return record(run, item, ImportItem.Result.SKIPPED, "Outside the date window.")

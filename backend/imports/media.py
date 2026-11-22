@@ -74,7 +74,7 @@ def gps_degrees(values, direction):
     return -result if direction in {"S", "W"} else result
 
 
-def with_file_metadata(item, image):
+def with_file_metadata(item, image, *, use_matching_local_date=False):
     try:
         exif = image.getexif()
         camera = exif.get_ifd(ExifTags.IFD.Exif)
@@ -90,7 +90,10 @@ def with_file_metadata(item, image):
 
     capture_text = timestamp if isinstance(timestamp, str) else ""
     if item.captured_on is not None:
-        captured_on, captured_at = item.captured_on, item.captured_at
+        matching_instant = item.captured_at is not None and item.captured_at == captured_at
+        if not (use_matching_local_date and matching_instant):
+            captured_on = item.captured_on
+        captured_at = item.captured_at
     if item.latitude is not None:
         latitude, longitude = item.latitude, item.longitude
     return replace(

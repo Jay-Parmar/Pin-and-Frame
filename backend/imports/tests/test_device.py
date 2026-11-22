@@ -1,4 +1,5 @@
-from datetime import date
+import json
+from datetime import date, datetime, timezone
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -26,11 +27,11 @@ class DeviceImportTests(TestCase):
             title="Sample trip", start_date=date(2025, 5, 2), end_date=date(2025, 5, 4)
         )
 
-    def import_source(self, **options):
+    def import_source(self, source="device", **options):
         call_command(
             "import_photos",
             str(self.source),
-            source="device",
+            source=source,
             trip=self.trip.pk,
             stdout=StringIO(),
             **options,
@@ -111,3 +112,30 @@ class DeviceImportTests(TestCase):
         photo = Photo.objects.get()
         self.assertTrue((self.media / photo.display_key).is_file())
         self.assertTrue((self.media / photo.thumbnail_key).is_file())
+
+    def test_takeout_window_uses_local_date_when_exif_matches_the_sidecar_instant(self):
+        local_day = date(2025, 5, 3)
+        captured = datetime(2025, 5, 2, 19, 30, tzinfo=timezone.utc)
+        exif = Image.Exif()
+        exif[36867] = "2025:05:03 01:00:00"
+        exif[36881] = "+05:30"
+        with Image.new("RGB", (200, 100), "purple") as image:
+            image.save(self.source / "local.jpg", exif=exif)
+        sidecar = self.source / "local.jpg.supplemental-metadata.json"
+        sidecar.write_text(
+            json.dumps({"title": "local.jpg", "photoTakenTime": {"timestamp": str(captured.timestamp())}}),
+            encoding="utf-8",
+        )
+
+        run = self.import_source(source="takeout", from_date=local_day, to_date=local_day)
+        photo = run.items.get().photo
+        self.assertEqual(photo.captured_on, local_day)
+        self.assertEqual(photo.captured_at, captured)
+
+        captured = captured.replace(day=1)
+        sidecar.write_text(
+            json.dumps({"title": "local.jpg", "photoTakenTime": {"timestamp": str(captured.timestamp())}}),
+            encoding="utf-8",
+        )
+        corrected = self.import_source(source="takeout", from_date=local_day)
+        self.assertEqual(corrected.items.get().result, ImportItem.Result.SKIPPED)
