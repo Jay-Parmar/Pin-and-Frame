@@ -14,10 +14,12 @@ from .serializers import ImportItemSerializer, ImportRunSerializer, ReviewSerial
 
 class ImportRunList(generics.ListAPIView):
     serializer_class = ImportRunSerializer
-    queryset = ImportRun.objects.annotate(**{
-        result: Count("items", filter=Q(items__result=result))
-        for result in ImportItem.Result.values
-    })
+    queryset = ImportRun.objects.annotate(
+        **{
+            result: Count("items", filter=Q(items__result=result))
+            for result in ImportItem.Result.values
+        }
+    ).order_by("-created_at", "id")
 
 
 class ImportItemList(generics.ListAPIView):
