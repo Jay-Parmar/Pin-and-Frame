@@ -132,6 +132,11 @@ input[type="checkbox"] { width: 1.05rem; height: 1.05rem; accent-color: var(--pi
   .page-heading { align-items: center; }
 }
 
+@media (max-width: 400px) {
+  .site-nav a { min-width: 0; gap: .3rem; padding-inline: .32rem; font-size: .85rem; }
+  .site-nav a svg { flex-shrink: 0; width: 15px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .button { transition: none; }
 }
