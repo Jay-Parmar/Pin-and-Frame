@@ -50,10 +50,12 @@ class TakeoutTests(TestCase):
         self.assertEqual(album_a.captured_at, datetime(2025, 1, 1, tzinfo=timezone.utc))
 
     def test_duplicate_suffix_pairs_with_the_corresponding_sidecar(self):
+        self.photo("Album", "photo.jpg")
         self.photo("Album", "photo(1).jpg")
         self.sidecar("Album", "photo.jpg.supplemental-metadata(1).json", "photo.jpg", 2)
-        (item,) = takeout_items(self.root)
-        self.assertEqual(item.longitude, 2)
+        items = {item.name: item for item in takeout_items(self.root)}
+        self.assertEqual(items["photo(1).jpg"].longitude, 2)
+        self.assertIsNone(items["photo.jpg"].longitude)
 
     def test_does_not_apply_one_sidecar_to_colliding_photos_in_the_same_album(self):
         local = "part-1/Takeout/Google Photos/Album"

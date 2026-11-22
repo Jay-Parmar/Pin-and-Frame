@@ -8,6 +8,7 @@ from .sources import PHOTO_EXTENSIONS, SourceImage, contained_file, coordinates,
 
 
 SIDECAR_NAME = re.compile(r"(?P<image>.+?)\.supplemental-[^.()]+(?P<copy>\(\d+\))?\.json$", re.I)
+NUMBERED_PHOTO = re.compile(r"\(\d+\)\.[^.]+$")
 
 
 @dataclass
@@ -36,7 +37,7 @@ def album_path(path, root):
     return tuple(part.casefold() for part in parts)
 
 
-def sidecar_index(paths, root):
+def sidecar_index(paths, root, photo_counts):
     filenames = defaultdict(list)
     titles = defaultdict(list)
     for path in paths:
@@ -56,8 +57,11 @@ def sidecar_index(paths, root):
         if not {"photoTakenTime", "geoData", "geoDataExif"}.intersection(metadata):
             continue
         sidecar = Sidecar(path, metadata)
-        filenames[sidecar_filename(path)].append(sidecar)
-        titles[metadata["title"].casefold()].append(sidecar)
+        filename = sidecar_filename(path)
+        title = metadata["title"].casefold()
+        filenames[filename].append(sidecar)
+        if filename == title or (filename not in photo_counts and not NUMBERED_PHOTO.search(filename)):
+            titles[title].append(sidecar)
     return filenames, titles
 
 
@@ -107,7 +111,7 @@ def takeout_items(root):
             sidecars.append(path)
     photo_counts = Counter(path.name.casefold() for path in photos)
     album_counts = Counter((album_path(path, root), path.name.casefold()) for path in photos)
-    filenames, titles = sidecar_index(sidecars, root)
+    filenames, titles = sidecar_index(sidecars, root, photo_counts)
     for path in photos:
         resolved = contained_file(root, path)
         if resolved is None:
