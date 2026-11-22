@@ -1,6 +1,6 @@
 from datetime import date
 
-from django.core.files.storage import default_storage
+from django.core.exceptions import SuspiciousFileOperation
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.db.models.deletion import ProtectedError
@@ -11,6 +11,7 @@ from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 
+from catalog.media import photo_path
 from catalog.models import Photo, Place, Trip, Visit
 from catalog.serializers import (
     GalleryFilters,
@@ -138,8 +139,8 @@ def photo_media(request, photo_id, variant):
 
     photo = get_object_or_404(Photo, pk=photo_id)
     try:
-        file = default_storage.open(getattr(photo, keys[variant]), "rb")
-    except FileNotFoundError as error:
-        raise NotFound("This photo copy is missing.") from error
+        file = photo_path(getattr(photo, keys[variant])).open("rb")
+    except (OSError, RuntimeError, SuspiciousFileOperation, ValueError):
+        raise NotFound("This photo copy is missing.") from None
 
     return FileResponse(file, content_type="image/webp", filename=f"{variant}.webp")

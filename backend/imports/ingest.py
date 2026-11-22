@@ -3,11 +3,12 @@ from contextlib import contextmanager
 from dataclasses import replace
 from zipfile import BadZipFile
 
-from django.core.files.storage import default_storage
+from django.core.exceptions import SuspiciousFileOperation
 from django.db import connection, transaction
 from django.utils import timezone
 from PIL import Image
 
+from catalog.media import photo_path
 from catalog.models import Photo
 
 from .media import copy_source, media_keys, open_image, with_file_metadata, write_media
@@ -85,12 +86,14 @@ def ingest_item(run, item, start, end):
             thumbnail_key, display_key = (
                 (photo.thumbnail_key, photo.display_key) if photo else media_keys(checksum)
             )
-            if photo is None or not all(default_storage.exists(key) for key in (thumbnail_key, display_key)):
+            if photo is None or not all(photo_path(key).is_file() for key in (thumbnail_key, display_key)):
                 width, height = write_media(image, thumbnail_key, display_key)
     except SourceError as error:
         return record(run, item, ImportItem.Result.FAILED, str(error))
     except (
         OSError,
+        RuntimeError,
+        SuspiciousFileOperation,
         ValueError,
         SyntaxError,
         BadZipFile,

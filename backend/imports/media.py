@@ -6,9 +6,10 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile, SpooledTemporaryFile
 
-from django.core.files.storage import default_storage
 from PIL import ExifTags, Image, ImageOps
 from pillow_heif import register_heif_opener
+
+from catalog.media import photo_path
 
 from .sources import SourceError, coordinates
 
@@ -114,7 +115,7 @@ def media_keys(checksum):
 def write_variant(image, key, max_size, quality):
     resized = image.copy()
     resized.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
-    out = Path(default_storage.path(key))
+    out = photo_path(key)
     out.parent.mkdir(parents=True, exist_ok=True)
     temp_path = None
     try:

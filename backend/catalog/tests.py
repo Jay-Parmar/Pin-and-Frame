@@ -1,6 +1,7 @@
 from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
@@ -223,3 +224,21 @@ class CatalogTests(TestCase):
                 self.api.get(f"/api/v1/photos/{self.photo.id}/display/").status_code,
                 404,
             )
+
+    def test_media_rejects_resolved_paths_outside_the_media_folder(self):
+        with TemporaryDirectory() as media_root, TemporaryDirectory() as other_root:
+            media_root = Path(media_root).resolve()
+            photo_path = media_root / self.photo.thumbnail_key
+            other_path = Path(other_root).resolve() / "thumbnail.webp"
+            other_path.write_bytes(b"fixture outside the media folder")
+            resolve = Path.resolve
+
+            def resolve_photo(path, *args, **kwargs):
+                if path == photo_path:
+                    return other_path
+                return resolve(path, *args, **kwargs)
+
+            with self.settings(MEDIA_ROOT=media_root), patch.object(Path, "resolve", resolve_photo):
+                response = self.api.get(f"/api/v1/photos/{self.photo.id}/thumbnail/")
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.json(), {"detail": "This photo copy is missing."})
