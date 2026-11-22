@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { api, messageFor } from './api'
 import type { Session } from './api'
+import { ArchivePage } from './ArchivePage'
 import { ImportsPage } from './ImportsPage'
 import { useQueryParams } from './navigation'
 import { TripsPage } from './TripsPage'
@@ -110,7 +111,7 @@ export function App() {
         {signOutError && <p className="error" role="alert">{signOutError}</p>}
         {view === 'trips' && <TripsPage params={params} change={change} />}
         {view === 'imports' && <ImportsPage params={params} change={change} />}
-        {view === 'archive' && <div className="page-heading"><h1>Travel archive</h1><a className="button primary" href="?view=trips">Add a trip</a></div>}
+        {view === 'archive' && <ArchivePage params={params} change={change} />}
       </main>
     </div>
   )
