@@ -258,7 +258,7 @@ export function ImportsPage({ params, change }: { params: URLSearchParams; chang
           </section>
         )}
         {run && (
-          <section className="panel workflow-card review-batch form-stack" aria-label="Import batch">
+          <section className="panel workflow-card review-batch form-stack" aria-label="Batch details">
             <div className="review-batch-filter">
               <label>Import batch
                 <select value={run.id} onChange={(event) => { setNotice(''); change({ run: event.target.value, page: null }) }}>
