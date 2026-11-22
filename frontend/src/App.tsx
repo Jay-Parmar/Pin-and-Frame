@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { api, messageFor } from './api'
 import type { Session } from './api'
+import { ImportsPage } from './ImportsPage'
+import { useQueryParams } from './navigation'
+import { TripsPage } from './TripsPage'
 
 function Brand() {
   return (
@@ -55,6 +58,9 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [loadError, setLoadError] = useState('')
   const [signOutError, setSignOutError] = useState('')
+  const { params, change } = useQueryParams()
+  const requestedView = params.get('view')
+  const view = requestedView === 'trips' || requestedView === 'imports' ? requestedView : 'archive'
 
   useEffect(() => {
     const request = new AbortController()
@@ -92,12 +98,19 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="site-header">
-        <Brand />
+        <a className="brand-link" href="?view=archive"><Brand /></a>
+        <nav className="site-nav" aria-label="Main navigation">
+          <a href="?view=archive" aria-current={view === 'archive' ? 'page' : undefined}>Archive</a>
+          <a href="?view=trips" aria-current={view === 'trips' ? 'page' : undefined}>Trips</a>
+          <a href="?view=imports" aria-current={view === 'imports' ? 'page' : undefined}>Imports</a>
+        </nav>
         <button className="button quiet" onClick={signOut}>Sign out</button>
       </header>
       <main className="page">
         {signOutError && <p className="error" role="alert">{signOutError}</p>}
-        <h1>Travel archive</h1>
+        {view === 'trips' && <TripsPage params={params} change={change} />}
+        {view === 'imports' && <ImportsPage params={params} change={change} />}
+        {view === 'archive' && <div className="page-heading"><h1>Travel archive</h1><a className="button primary" href="?view=trips">Add a trip</a></div>}
       </main>
     </div>
   )
