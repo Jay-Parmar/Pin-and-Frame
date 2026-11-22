@@ -3,6 +3,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 from zipfile import ZipFile
 
 from imports.instagram import instagram_items
@@ -86,3 +87,15 @@ class InstagramTests(TestCase):
     def test_reports_missing_posts_manifest(self):
         with self.assertRaisesRegex(SourceError, "No Instagram posts JSON"):
             list(instagram_items(self.root))
+
+    def test_unreadable_manifest_does_not_interrupt_other_batches(self):
+        for name in ("posts.json", "posts_1.json"):
+            (self.root / name).write_text("[]", encoding="utf-8")
+        (self.root / "sample.jpg").touch()
+        next_manifest = [{"media": [{"uri": "sample.jpg"}]}]
+
+        with patch("imports.instagram.json.loads", side_effect=[RecursionError(), next_manifest]):
+            broken, photo = instagram_items(self.root)
+        self.assertIn("could not be read", broken.issue)
+        self.assertIsNone(broken.open_file)
+        self.assertEqual(photo.name, "sample.jpg")

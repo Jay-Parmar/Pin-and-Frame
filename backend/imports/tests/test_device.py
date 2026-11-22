@@ -82,6 +82,17 @@ class DeviceImportTests(TestCase):
             {ImportItem.Result.IMPORTED, ImportItem.Result.FAILED},
         )
 
+    def test_invalid_caption_characters_do_not_abort_the_batch(self):
+        self.write_photo()
+        manifest = [{"media": [{"uri": "sample.jpg", "title": "café\x00\ud800"}]}]
+        (self.source / "posts.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+        run = self.import_source(source="instagram")
+        item = run.items.get()
+        self.assertEqual(item.result, ImportItem.Result.IMPORTED)
+        self.assertEqual(item.caption, "café?")
+        self.assertEqual(item.photo.caption, "café?")
+
     def test_imports_a_heic_original(self):
         exif = Image.Exif()
         exif[36867] = "2025:05:03 11:00:00"

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from imports.takeout import takeout_items
 
@@ -48,6 +49,16 @@ class TakeoutTests(TestCase):
         self.assertEqual((album_a.longitude, album_b.longitude), (4, 7))
         self.assertEqual(album_a.latitude, 0)
         self.assertEqual(album_a.captured_at, datetime(2025, 1, 1, tzinfo=timezone.utc))
+
+    def test_sidecar_limit_counts_bytes(self):
+        self.photo("Album", "photo.jpg")
+        sidecar = self.root / "Album" / "photo.jpg.json"
+        metadata = '{"title":"photo.jpg","geoData":{"latitude":0,"longitude":4},"note":"café"}'
+        sidecar.write_text(metadata, encoding="utf-8")
+
+        with patch("imports.takeout.MAX_SIDECAR_BYTES", len(metadata)):
+            (photo,) = takeout_items(self.root)
+        self.assertIsNone(photo.longitude)
 
     def test_duplicate_suffix_pairs_with_the_corresponding_sidecar(self):
         self.photo("Album", "photo.jpg")

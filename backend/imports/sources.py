@@ -59,7 +59,7 @@ def contained_file(root, path):
         resolved = path.resolve(strict=True)
         if resolved.is_relative_to(root) and resolved.is_file():
             return resolved
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError, ValueError):
         return None
     return None
 

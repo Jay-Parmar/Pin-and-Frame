@@ -9,6 +9,7 @@ from .sources import PHOTO_EXTENSIONS, SourceImage, contained_file, coordinates,
 
 SIDECAR_NAME = re.compile(r"(?P<image>.+?)\.supplemental-[^.()]+(?P<copy>\(\d+\))?\.json$", re.I)
 NUMBERED_PHOTO = re.compile(r"\(\d+\)\.[^.]+$")
+MAX_SIDECAR_BYTES = 2 * 1024 * 1024
 
 
 @dataclass
@@ -45,12 +46,12 @@ def sidecar_index(paths, root, photo_counts):
         if resolved is None:
             continue
         try:
-            with resolved.open("r", encoding="utf-8-sig") as file:
-                text = file.read(2 * 1024 * 1024 + 1)
-            if len(text) > 2 * 1024 * 1024:
+            with resolved.open("rb") as file:
+                content = file.read(MAX_SIDECAR_BYTES + 1)
+            if len(content) > MAX_SIDECAR_BYTES:
                 continue
-            metadata = json.loads(text)
-        except (OSError, ValueError):
+            metadata = json.loads(content.decode("utf-8-sig"))
+        except (OSError, ValueError, RecursionError):
             continue
         if not isinstance(metadata, dict) or not isinstance(metadata.get("title"), str):
             continue

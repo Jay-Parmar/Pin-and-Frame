@@ -128,7 +128,7 @@ def manifest_items(paths, lookup):
         except SourceError as error:
             yield SourceImage(path.name, issue=str(error))
             continue
-        except (OSError, ValueError, BadZipFile, NotImplementedError):
+        except (OSError, ValueError, BadZipFile, NotImplementedError, RecursionError):
             yield SourceImage(path.name, issue="The posts JSON file could not be read.")
             continue
 
@@ -163,5 +163,5 @@ def instagram_items(source):
                 return (lambda: archive.open(info)) if info else None
 
             yield from manifest_items(members, lookup)
-    except (OSError, BadZipFile):
+    except (OSError, BadZipFile, ValueError):
         raise SourceError("Instagram ZIP could not be read.") from None

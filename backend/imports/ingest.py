@@ -32,17 +32,21 @@ def import_lock():
             cursor.execute("SELECT pg_advisory_unlock(%s)", [IMPORT_LOCK])
 
 
+def imported_text(value):
+    return value.replace("\x00", "").encode("utf-8", "replace").decode("utf-8")
+
+
 def record(run, item, result, issue="", photo=None):
     ImportItem.objects.create(
         run=run,
-        name=item.name[:255].replace("\x00", ""),
+        name=imported_text(item.name)[:255],
         result=result,
-        issue=issue[:240].replace("\x00", ""),
+        issue=imported_text(issue)[:240],
         photo=photo,
-        caption=item.caption.replace("\x00", ""),
+        caption=imported_text(item.caption),
         captured_on=item.captured_on,
         captured_at=item.captured_at,
-        capture_text=item.capture_text[:64].replace("\x00", ""),
+        capture_text=imported_text(item.capture_text)[:64],
         published_at=item.published_at,
         latitude=item.latitude,
         longitude=item.longitude,
@@ -111,7 +115,7 @@ def ingest_item(run, item, start, end):
             return record(run, item, ImportItem.Result.REUSED, issue, photo)
         photo = Photo.objects.create(
             sha256=checksum,
-            caption=item.caption.replace("\x00", ""),
+            caption=imported_text(item.caption),
             captured_on=item.captured_on,
             captured_at=item.captured_at,
             width=width,
