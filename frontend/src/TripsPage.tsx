@@ -54,7 +54,7 @@ function ImportInstructions({ trip }: { trip: Trip }) {
     device: 'C:\\path\\to\\photos',
     takeout: 'C:\\path\\to\\extracted-takeout',
   }
-  const command = `python manage.py import_photos --source ${source} --trip ${trip.id} '${sources[source]}'`
+  const command = `.\\.venv\\Scripts\\python backend\\manage.py import_photos --source ${source} --trip ${trip.id} '${sources[source]}'`
 
   async function copyCommand() {
     try {
@@ -76,7 +76,7 @@ function ImportInstructions({ trip }: { trip: Trip }) {
             <option value="takeout">Google Takeout</option>
           </select>
         </label>
-        <p className="muted">Run this in the backend folder with the actual file or folder path.</p>
+        <p className="muted">Run this from the repo folder with the actual file or folder path.</p>
         <code className="command">{command}</code>
         <div className="actions">
           <button className="button" onClick={copyCommand}>Copy command</button>
