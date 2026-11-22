@@ -46,7 +46,7 @@ def unix_timestamp(value):
 
 
 def member_path(value):
-    if not isinstance(value, str) or not value or "\\" in value or ":" in value:
+    if not isinstance(value, str) or not value or any(char in value for char in ("\\", ":", "\x00")):
         return None
     path = PurePosixPath(value)
     if path.is_absolute() or ".." in path.parts or not path.name:

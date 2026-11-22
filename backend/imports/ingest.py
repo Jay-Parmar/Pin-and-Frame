@@ -1,6 +1,7 @@
 from collections import Counter
 from contextlib import contextmanager
 from dataclasses import replace
+from zipfile import BadZipFile
 
 from django.core.files.storage import default_storage
 from django.db import connection, transaction
@@ -86,7 +87,15 @@ def ingest_item(run, item, start, end):
                 width, height = write_media(image, thumbnail_key, display_key)
     except SourceError as error:
         return record(run, item, ImportItem.Result.FAILED, str(error))
-    except (OSError, ValueError, SyntaxError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+    except (
+        OSError,
+        ValueError,
+        SyntaxError,
+        BadZipFile,
+        NotImplementedError,
+        Image.DecompressionBombError,
+        Image.DecompressionBombWarning,
+    ):
         return record(run, item, ImportItem.Result.FAILED, "Photo could not be read or saved.")
 
     with transaction.atomic():

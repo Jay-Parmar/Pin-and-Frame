@@ -6,12 +6,17 @@ from django.core.management.base import BaseCommand, CommandError
 
 from catalog.models import Trip
 from imports.ingest import import_photos
+from imports.instagram import instagram_items
 from imports.models import ImportItem, ImportRun
 from imports.sources import SourceError, device_items
 from imports.takeout import takeout_items
 
 
-SOURCES = {ImportRun.Source.DEVICE: device_items, ImportRun.Source.TAKEOUT: takeout_items}
+SOURCES = {
+    ImportRun.Source.DEVICE: device_items,
+    ImportRun.Source.TAKEOUT: takeout_items,
+    ImportRun.Source.INSTAGRAM: instagram_items,
+}
 
 
 class Command(BaseCommand):
@@ -30,9 +35,10 @@ class Command(BaseCommand):
         try:
             root = path.resolve(strict=True)
         except (OSError, RuntimeError):
-            raise CommandError("The source folder is unavailable.") from None
-        if not root.is_dir():
-            raise CommandError("Choose an extracted source folder.")
+            raise CommandError("The import source is unavailable.") from None
+        instagram_zip = source == ImportRun.Source.INSTAGRAM and root.is_file() and root.suffix.lower() == ".zip"
+        if not root.is_dir() and not instagram_zip:
+            raise CommandError("Choose an extracted source folder or an Instagram ZIP.")
         try:
             target_trip = Trip.objects.get(pk=trip)
         except Trip.DoesNotExist:
