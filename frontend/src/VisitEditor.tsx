@@ -91,39 +91,46 @@ export function VisitEditor({ trip, places, visit, hint, onSave, onCancel }: Vis
   }
 
   return (
-    <form className="form-stack" onSubmit={save}>
-      <label>Place
-        <select value={existingPlace} disabled={editingPlace || busy} onChange={(event) => setExistingPlace(event.target.value)}>
-          <option value="">New place</option>
-          {existingPlace && !places.some((place) => place.id === existingPlace) && <option value={existingPlace}>Saved place</option>}
-          {places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
-        </select>
-      </label>
-      {selectedPlace && !editingPlace && (
-        <div><button type="button" className="button quiet" disabled={busy} onClick={editPlace}>Edit saved place</button></div>
-      )}
+    <form className="form-stack workflow-visit-form" onSubmit={save} aria-busy={busy}>
+      <div className="workflow-place-select">
+        <label>Place
+          <select value={existingPlace} disabled={editingPlace || busy} onChange={(event) => setExistingPlace(event.target.value)}>
+            <option value="">New place</option>
+            {existingPlace && !places.some((place) => place.id === existingPlace) && <option value={existingPlace}>{selectedPlace?.name ?? 'Saved place'}</option>}
+            {places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
+          </select>
+        </label>
+        {selectedPlace && !editingPlace && (
+          <button type="button" className="button" disabled={busy} onClick={editPlace}>Edit saved place</button>
+        )}
+      </div>
       {(!existingPlace || editingPlace) && (
         <>
           {editingPlace && <p className="muted">Changes apply to all visits to this place.</p>}
-          <label>Place name<input name="name" defaultValue={editingPlace ? selectedPlace?.name : ''} maxLength={200} required /></label>
-          <button type="button" className="button" onClick={() => setShowMap(!showMap)} aria-expanded={showMap}>
-            {showMap ? 'Hide map' : 'Pick on map'}
-          </button>
-          {showMap && (
-            <Suspense fallback={<p role="status">Opening map…</p>}>
-              <TravelMap points={points} onPick={pickCoordinates} />
-            </Suspense>
-          )}
-          <div className="form-row">
-            <label>Latitude<input type="number" min="-90" max="90" step="any" value={latitude} onChange={(event) => setLatitude(event.target.value)} required /></label>
-            <label>Longitude<input type="number" min="-180" max="180" step="any" value={longitude} onChange={(event) => setLongitude(event.target.value)} required /></label>
+          <label>Place name<input name="name" defaultValue={editingPlace ? selectedPlace?.name : ''} maxLength={200} disabled={busy} required /></label>
+          <div className="workflow-coordinate-panel form-stack">
+            <div className="section-heading">
+              <p className="workflow-field-title">Pin location</p>
+              <button type="button" className="button" onClick={() => setShowMap(!showMap)} disabled={busy} aria-expanded={showMap}>
+                {showMap ? 'Hide map' : 'Pick on map'}
+              </button>
+            </div>
+            {showMap && (
+              <Suspense fallback={<p role="status">Opening map…</p>}>
+                <TravelMap points={points} onPick={pickCoordinates} />
+              </Suspense>
+            )}
+            <div className="form-row">
+              <label>Latitude<input type="number" min="-90" max="90" step="any" value={latitude} onChange={(event) => setLatitude(event.target.value)} disabled={busy} required /></label>
+              <label>Longitude<input type="number" min="-180" max="180" step="any" value={longitude} onChange={(event) => setLongitude(event.target.value)} disabled={busy} required /></label>
+            </div>
           </div>
         </>
       )}
       <div hidden={editingPlace}>
         <div className="form-row">
-          <label>Visit date<input type="date" name="visited_on" min={trip.start_date} max={trip.end_date} defaultValue={visit?.visited_on ?? trip.start_date} disabled={editingPlace} required /></label>
-          <label>Stop order<input type="number" name="position" min="1" defaultValue={visit?.position ?? nextPosition} disabled={editingPlace} required /></label>
+          <label>Visit date<input type="date" name="visited_on" min={trip.start_date} max={trip.end_date} defaultValue={visit?.visited_on ?? trip.start_date} disabled={editingPlace || busy} required /></label>
+          <label>Stop order<input type="number" name="position" min="1" defaultValue={visit?.position ?? nextPosition} disabled={editingPlace || busy} required /></label>
         </div>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
