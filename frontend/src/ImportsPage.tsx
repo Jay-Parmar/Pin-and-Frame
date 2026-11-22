@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, messageFor } from './api'
 import { formatDate, photoDate } from './catalog'
 import type { Coordinates, PageResult, Photo, Place, Trip, TripDetail } from './catalog'
@@ -8,8 +8,10 @@ import { Pagination } from './Pagination'
 import { PhotoDialog } from './PhotoDialog'
 import { useApi, useList } from './useData'
 import { VisitEditor } from './VisitEditor'
+import './workflow.css'
 
 const sources: Record<string, string> = { device: 'Phone photos', takeout: 'Google Takeout', instagram: 'Instagram' }
+const batchDate = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 
 interface ImportRun {
   id: string
@@ -38,6 +40,9 @@ interface ImportItem {
 
 const reviewStates = ['pending', 'approved', 'ignored', 'failed', 'skipped', 'all'] as const
 type ReviewFilter = typeof reviewStates[number]
+const reviewLabels: Record<ReviewFilter, string> = {
+  pending: 'To review', approved: 'Approved', ignored: 'Ignored', failed: 'Failed', skipped: 'Skipped', all: 'All items',
+}
 
 function filterValue(value: string | null): ReviewFilter {
   return reviewStates.find((status) => status === value) ?? 'pending'
@@ -60,8 +65,14 @@ function ReviewItems({
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState<Photo | null>(null)
   const [newStop, setNewStop] = useState<{ hint?: Coordinates } | null>(null)
+  const assignmentTitle = useRef<HTMLHeadingElement>(null)
+  const stopTitle = useRef<HTMLHeadingElement>(null)
   const photoIds = Array.from(new Set(results.flatMap((item) => item.photo ? [item.photo.id] : [])))
   const allSelected = photoIds.length > 0 && photoIds.every((id) => selected.has(id))
+
+  useEffect(() => {
+    if (newStop) stopTitle.current?.focus()
+  }, [newStop])
 
   function toggle(id: string) {
     setSelected((current) => {
@@ -95,82 +106,107 @@ function ReviewItems({
 
   return (
     <>
-      {photoIds.length > 0 && (
-        <section className="review-actions form-stack" aria-label="Photo decisions">
-          <div className="section-heading">
-            <label className="check"><input type="checkbox" checked={allSelected} disabled={busy} onChange={() => setSelected(new Set(allSelected ? [] : photoIds))} />Select this page</label>
-            <span className="muted">{selected.size} selected</span>
-          </div>
-          <div className="form-row">
+      {newStop && (
+        <section className="panel workflow-card workflow-stop-editor form-stack">
+          <h2 ref={stopTitle} tabIndex={-1}>Add a stop for {trip.title}</h2>
+          <VisitEditor key={`${newStop.hint?.latitude},${newStop.hint?.longitude}`} trip={trip} places={places} hint={newStop.hint} onSave={() => { setNewStop(null); onVisitSaved() }} onCancel={() => setNewStop(null)} />
+        </section>
+      )}
+      <div className={photoIds.length ? 'review-workspace has-photos' : 'review-workspace'}>
+        <section className="review-photo-stream" aria-label="Import items">
+          {photoIds.length > 0 && (
+            <div className="review-select-bar">
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  disabled={busy}
+                  ref={(input) => { if (input) input.indeterminate = selected.size > 0 && !allSelected }}
+                  onChange={() => setSelected(new Set(allSelected ? [] : photoIds))}
+                />
+                Select this page
+              </label>
+              <span role="status" className="review-selected-count">{selected.size} selected</span>
+              {selected.size > 0 && <button type="button" className="button review-jump" onClick={() => assignmentTitle.current?.focus()}>Review selection</button>}
+            </div>
+          )}
+          <ul className="review-list" role="list">
+            {results.map((item) => {
+              const photo = item.photo
+              const sourceDate = item.captured_on ?? item.captured_at?.slice(0, 10)
+              const photoCaptureDate = photo?.captured_on ?? photo?.captured_at?.slice(0, 10)
+              const suggestion = trip.visits.find((visit) => visit.id === item.suggested_visit)
+              const hint = item.latitude === null || item.longitude === null ? undefined : { latitude: item.latitude, longitude: item.longitude }
+              return (
+                <li key={item.id} className="review-item review-record" data-selected={photo && selected.has(photo.id) ? 'true' : undefined}>
+                  {photo && (
+                    <button className="image-button" onClick={() => setPreview(photo)} aria-label={`Preview ${item.name}`}>
+                      <img src={photo.thumbnail_url} loading="lazy" decoding="async" alt="" />
+                    </button>
+                  )}
+                  <div className="review-description">
+                    <strong>{item.name}</strong>
+                    {photo && <p className="muted">{photoDate(photo)} · {reviewLabels[photo.state]}</p>}
+                    {sourceDate && sourceDate !== photoCaptureDate && (
+                      <p className="muted">Source capture date {formatDate(sourceDate)}</p>
+                    )}
+                    {item.published_at && <p className="muted">Posted {formatDate(item.published_at)}</p>}
+                    {item.issue && <p className="muted">{item.issue}</p>}
+                    {hint && <p className="muted">GPS {hint.latitude.toFixed(4)}, {hint.longitude.toFixed(4)}</p>}
+                    {suggestion && (
+                      <>
+                        {item.suggestion_reason && <p className="muted">Suggested by {item.suggestion_reason}</p>}
+                        <button type="button" className="button review-inline-action" disabled={busy} onClick={() => {
+                          if (photo) setSelected(new Set([photo.id]))
+                          setVisitId(suggestion.id)
+                          assignmentTitle.current?.focus()
+                        }}>Use {suggestion.place.name}</button>
+                      </>
+                    )}
+                    {hint && !suggestion && <button type="button" className="button review-inline-action" disabled={busy} onClick={() => setNewStop({ hint })}>Add stop at GPS</button>}
+                  </div>
+                  {photo && (
+                    <label className="review-item-check">
+                      <input type="checkbox" aria-label={`Select ${item.name}`} disabled={busy} checked={selected.has(photo.id)} onChange={() => toggle(photo.id)} />
+                    </label>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+        {photoIds.length > 0 && (
+          <section className="panel workflow-card review-controls form-stack" aria-labelledby="review-assignment-title" aria-busy={busy}>
+            <h2 id="review-assignment-title" ref={assignmentTitle} tabIndex={-1}>Assign photos</h2>
             <label>Assign to stop
-              <select value={visitId} onChange={(event) => setVisitId(event.target.value)}>
+              <select value={visitId} disabled={busy} onChange={(event) => setVisitId(event.target.value)}>
                 <option value="">Choose a stop</option>
                 {trip.visits.map((visit) => <option value={visit.id} key={visit.id}>{visit.place.name} · {formatDate(visit.visited_on)}</option>)}
               </select>
             </label>
-            <label>Capture date
-              <select value={dateMode} onChange={(event) => setDateMode(event.target.value)}>
-                <option value="keep">Keep dates</option>
-                <option value="set">Set date</option>
-                <option value="clear">Clear date</option>
-              </select>
-            </label>
-            {dateMode === 'set' && <label>New date<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>}
-          </div>
-          <div className="actions">
-            <button className="button primary" disabled={busy || !selected.size || !visitId || (dateMode === 'set' && !date)} onClick={() => apply('approved')}>Apply to selection</button>
-            <button className="button" disabled={busy || !selected.size} onClick={() => apply('ignored')}>Ignore</button>
-            <button className="button quiet" disabled={busy || !selected.size} onClick={() => apply('pending')}>Return to pending</button>
-            <button className="button quiet" type="button" onClick={() => setNewStop({})}>Add stop</button>
-          </div>
-          {error && <p role="alert" className="error">{error}</p>}
-        </section>
-      )}
-      {newStop && (
-        <div className="inline-editor form-stack">
-          <h3>Add a stop for {trip.title}</h3>
-          <VisitEditor key={`${newStop.hint?.latitude},${newStop.hint?.longitude}`} trip={trip} places={places} hint={newStop.hint} onSave={() => { setNewStop(null); onVisitSaved() }} onCancel={() => setNewStop(null)} />
-        </div>
-      )}
-      <ul className="review-list">
-        {results.map((item) => {
-          const photo = item.photo
-          const sourceDate = item.captured_on ?? item.captured_at?.slice(0, 10)
-          const photoCaptureDate = photo?.captured_on ?? photo?.captured_at?.slice(0, 10)
-          const suggestion = trip.visits.find((visit) => visit.id === item.suggested_visit)
-          const hint = item.latitude === null || item.longitude === null ? undefined : { latitude: item.latitude, longitude: item.longitude }
-          return (
-            <li key={item.id} className="review-item">
-              {photo && (
-                <button className="image-button" onClick={() => setPreview(photo)} aria-label={`Preview ${item.name}`}>
-                  <img src={photo.thumbnail_url} loading="lazy" alt="" />
-                </button>
-              )}
-              <div className="review-description">
-                <strong>{item.name}</strong>
-                {photo && <p className="muted">{photoDate(photo)} · {photo.state}</p>}
-                {sourceDate && sourceDate !== photoCaptureDate && (
-                  <p className="muted">Source capture date {formatDate(sourceDate)}</p>
-                )}
-                {item.published_at && <p className="muted">Posted {formatDate(item.published_at)}</p>}
-                {item.issue && <p className="muted">{item.issue}</p>}
-                {hint && <p className="muted">GPS {hint.latitude.toFixed(4)}, {hint.longitude.toFixed(4)}</p>}
-                {suggestion && (
-                  <>
-                    {item.suggestion_reason && <p className="muted">Suggested by {item.suggestion_reason}</p>}
-                    <button type="button" className="button quiet" disabled={busy} onClick={() => {
-                      if (photo) setSelected(new Set([photo.id]))
-                      setVisitId(suggestion.id)
-                    }}>Use {suggestion.place.name}</button>
-                  </>
-                )}
-                {hint && !suggestion && <button type="button" className="button quiet" onClick={() => setNewStop({ hint })}>Add stop at GPS</button>}
+            <button type="button" className="button quiet review-add-stop" disabled={busy} onClick={() => setNewStop({})}>Add stop</button>
+            <details className="workflow-disclosure review-date-options">
+              <summary>{dateMode === 'keep' ? 'Adjust capture date' : dateMode === 'clear' ? 'Clear capture date' : 'Set capture date'}</summary>
+              <div className="form-stack">
+                <label>Capture date
+                  <select value={dateMode} disabled={busy} onChange={(event) => setDateMode(event.target.value)}>
+                    <option value="keep">Keep dates</option>
+                    <option value="set">Set date</option>
+                    <option value="clear">Clear date</option>
+                  </select>
+                </label>
+                {dateMode === 'set' && <label>New date<input type="date" value={date} disabled={busy} onChange={(event) => setDate(event.target.value)} /></label>}
               </div>
-              {photo && <input type="checkbox" aria-label={`Select ${item.name}`} disabled={busy} checked={selected.has(photo.id)} onChange={() => toggle(photo.id)} />}
-            </li>
-          )
-        })}
-      </ul>
+            </details>
+            <button type="button" className="button primary" disabled={busy || !selected.size || !visitId || (dateMode === 'set' && !date)} onClick={() => apply('approved')}>{busy ? 'Saving…' : 'Apply to selection'}</button>
+            <div className="actions review-secondary-actions">
+              <button type="button" className="button quiet" disabled={busy || !selected.size} onClick={() => apply('ignored')}>Ignore</button>
+              <button type="button" className="button quiet" disabled={busy || !selected.size} onClick={() => apply('pending')}>Return to pending</button>
+            </div>
+            {error && <p role="alert" className="error">{error}</p>}
+          </section>
+        )}
+      </div>
       {preview && <PhotoDialog photo={preview} onClose={() => setPreview(null)} />}
     </>
   )
@@ -180,7 +216,9 @@ export function ImportsPage({ params, change }: { params: URLSearchParams; chang
   const runs = useList<ImportRun>('imports/')
   const trips = useList<Trip>('trips/')
   const places = useList<Place>('places/')
-  const run = runs.data?.find((item) => item.id === params.get('run')) ?? runs.data?.[0]
+  const tripScope = params.get('trip')
+  const visibleRuns = tripScope ? runs.data?.filter((item) => item.trip === tripScope) : runs.data
+  const run = visibleRuns?.find((item) => item.id === params.get('run')) ?? visibleRuns?.[0]
   const status = filterValue(params.get('status'))
   const page = pageNumber(params)
   const trip = useApi<TripDetail>(run ? `trips/${run.trip}/` : null)
@@ -201,41 +239,66 @@ export function ImportsPage({ params, change }: { params: URLSearchParams; chang
   }
 
   return (
-    <>
-      <div className="page-heading"><h1>Imports</h1></div>
-      <section className="panel form-stack" aria-label="Import review">
+    <div className="workflow-imports">
+      <div className="page-heading workflow-heading">
+        <h1>Imports</h1>
+        {run && <a className="button" href={`?view=trips&trip=${encodeURIComponent(run.trip)}`}>Open trip</a>}
+      </div>
+      <section className="form-stack" aria-label="Import review">
         {runs.loading && <p role="status" className="muted">Loading imports…</p>}
         {[runs.error, trip.error, items.error].filter(Boolean).map((error, index) => <p className="error" role="alert" key={index}>{error}</p>)}
-        {runs.data?.length === 0 && (
-          <><h2>No imports yet</h2><p className="muted">Create a trip and run its import command. Your batches will appear here.</p><div><a className="button primary" href="?view=trips">Open trips</a></div></>
+        {visibleRuns?.length === 0 && (
+          <section className="panel workflow-card form-stack">
+            <h2>{tripScope ? 'No imports for this trip yet' : 'No imports yet'}</h2>
+            <p className="muted">{tripScope ? 'Copy the import command from the trip to start a batch.' : 'Create a trip and run its import command to add photos.'}</p>
+            <div className="actions">
+              <a className="button primary" href={tripScope ? `?view=trips&trip=${encodeURIComponent(tripScope)}` : '?view=trips'}>{tripScope ? 'Open trip' : 'Open trips'}</a>
+              {tripScope && <a className="button" href="?view=imports">Show all batches</a>}
+            </div>
+          </section>
         )}
         {run && (
-          <>
-            <div className="form-row filters">
+          <section className="panel workflow-card review-batch form-stack" aria-label="Import batch">
+            <div className="review-batch-filter">
               <label>Import batch
                 <select value={run.id} onChange={(event) => { setNotice(''); change({ run: event.target.value, page: null }) }}>
-                  {runs.data?.map((item) => (
+                  {visibleRuns?.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {sources[item.source] || item.source} · {trips.data?.find((entry) => entry.id === item.trip)?.title ?? 'Trip'} · {formatDate(item.created_at)}
+                      {sources[item.source] || item.source} · {trips.data?.find((entry) => entry.id === item.trip)?.title ?? 'Trip'} · {batchDate.format(new Date(item.created_at))}
                     </option>
                   ))}
                 </select>
               </label>
-              <label>Show
-                <select value={status} onChange={(event) => { setNotice(''); change({ status: event.target.value, page: null }) }}>
-                  {reviewStates.map((state) => <option key={state} value={state}>{state[0].toUpperCase() + state.slice(1)}</option>)}
-                </select>
-              </label>
+              <div className="actions">
+                <button className="button" onClick={() => { runs.reload(); items.reload() }}>Refresh</button>
+                {tripScope && <a className="button quiet" href="?view=imports">Show all batches</a>}
+              </div>
             </div>
+            <dl className="review-run-summary">
+              <div><dt>Imported</dt><dd>{run.counts.imported}</dd></div>
+              <div><dt>Reused</dt><dd>{run.counts.reused}</dd></div>
+              <div><dt>Skipped</dt><dd>{run.counts.skipped}</dd></div>
+              <div data-failed={run.counts.failed > 0 || undefined}><dt>Failed</dt><dd>{run.counts.failed}</dd></div>
+            </dl>
             <div className="section-heading">
-              <p className="muted">{run.status} · {run.counts.imported} imported · {run.counts.reused} reused · {run.counts.skipped} skipped · {run.counts.failed} failed</p>
-              <button className="button quiet" onClick={() => { runs.reload(); items.reload() }}>Refresh</button>
+              <div className="review-filters" role="group" aria-label="Filter import items">
+                {reviewStates.map((state) => (
+                  <button type="button" key={state} className="review-filter" aria-pressed={status === state} onClick={() => { setNotice(''); change({ status: state, page: null }) }}>
+                    {reviewLabels[state]}
+                  </button>
+                ))}
+              </div>
+              <p className="review-run-status" data-status={run.status}>{run.status}</p>
             </div>
-          </>
+          </section>
         )}
         {notice && <p role="status" className="success">{notice}</p>}
         {(items.loading || trip.loading) && <p role="status" className="muted">Loading photos…</p>}
-        {items.data?.results.length === 0 && <p className="muted">No {status === 'all' ? '' : `${status} `}items in this batch.</p>}
+        {items.data?.results.length === 0 && (
+          <section className="panel workflow-card">
+            <p className="muted">{status === 'pending' ? 'No photos are waiting for review.' : 'No items match this filter.'}</p>
+          </section>
+        )}
         {items.data && items.data.results.length > 0 && trip.data && (
           <>
             <ReviewItems key={`${run?.id}:${status}:${page}`} results={items.data.results} trip={trip.data} places={places.data ?? []} onVisitSaved={onVisitSaved} onUpdate={onUpdate} />
@@ -243,6 +306,6 @@ export function ImportsPage({ params, change }: { params: URLSearchParams; chang
           </>
         )}
       </section>
-    </>
+    </div>
   )
 }
