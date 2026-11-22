@@ -18,9 +18,12 @@ export function VisitEditor({ trip, places, visit, hint, onSave, onCancel }: Vis
   const [existingPlace, setExistingPlace] = useState(visit?.place.id ?? '')
   const [latitude, setLatitude] = useState(hint ? String(hint.latitude) : '')
   const [longitude, setLongitude] = useState(hint ? String(hint.longitude) : '')
+  const [editingPlace, setEditingPlace] = useState(false)
   const [showMap, setShowMap] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const selectedPlace = places.find((place) => place.id === existingPlace)
+    ?? (visit?.place.id === existingPlace ? visit.place : undefined)
   const nextPosition = trip.visits.reduce((last, item) => Math.max(last, item.position), 0) + 1
   const points = useMemo(() => {
     const lat = Number(latitude)
@@ -35,17 +38,42 @@ export function VisitEditor({ trip, places, visit, hint, onSave, onCancel }: Vis
     setLongitude(String(coordinates.longitude))
   }
 
+  function editPlace() {
+    if (!selectedPlace) return
+    pickCoordinates(selectedPlace)
+    setError('')
+    setEditingPlace(true)
+  }
+
+  function cancelPlaceEdit() {
+    setLatitude(hint ? String(hint.latitude) : '')
+    setLongitude(hint ? String(hint.longitude) : '')
+    setError('')
+    setShowMap(false)
+    setEditingPlace(false)
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setBusy(true)
     setError('')
     const fields = new FormData(event.currentTarget)
+    const placeValues = {
+      name: String(fields.get('name') ?? '').trim(),
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+    }
     try {
+      if (editingPlace) {
+        await api(`places/${existingPlace}/`, { method: 'PATCH', body: placeValues })
+        onSave()
+        return
+      }
       let place = existingPlace
       if (!place) {
         const newPlace = await api<Place>('places/', {
           method: 'POST',
-          body: { name: String(fields.get('name')).trim(), latitude: Number(latitude), longitude: Number(longitude) },
+          body: placeValues,
         })
         place = newPlace.id
         setExistingPlace(newPlace.id)
@@ -65,15 +93,19 @@ export function VisitEditor({ trip, places, visit, hint, onSave, onCancel }: Vis
   return (
     <form className="form-stack" onSubmit={save}>
       <label>Place
-        <select value={existingPlace} onChange={(event) => setExistingPlace(event.target.value)}>
+        <select value={existingPlace} disabled={editingPlace || busy} onChange={(event) => setExistingPlace(event.target.value)}>
           <option value="">New place</option>
           {existingPlace && !places.some((place) => place.id === existingPlace) && <option value={existingPlace}>Saved place</option>}
           {places.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
         </select>
       </label>
-      {!existingPlace && (
+      {selectedPlace && !editingPlace && (
+        <div><button type="button" className="button quiet" disabled={busy} onClick={editPlace}>Edit saved place</button></div>
+      )}
+      {(!existingPlace || editingPlace) && (
         <>
-          <label>Place name<input name="name" maxLength={160} required /></label>
+          {editingPlace && <p className="muted">Changes apply to all visits to this place.</p>}
+          <label>Place name<input name="name" defaultValue={editingPlace ? selectedPlace?.name : ''} maxLength={200} required /></label>
           <button type="button" className="button" onClick={() => setShowMap(!showMap)} aria-expanded={showMap}>
             {showMap ? 'Hide map' : 'Pick on map'}
           </button>
@@ -88,14 +120,16 @@ export function VisitEditor({ trip, places, visit, hint, onSave, onCancel }: Vis
           </div>
         </>
       )}
-      <div className="form-row">
-        <label>Visit date<input type="date" name="visited_on" min={trip.start_date} max={trip.end_date} defaultValue={visit?.visited_on ?? trip.start_date} required /></label>
-        <label>Stop order<input type="number" name="position" min="1" defaultValue={visit?.position ?? nextPosition} required /></label>
+      <div hidden={editingPlace}>
+        <div className="form-row">
+          <label>Visit date<input type="date" name="visited_on" min={trip.start_date} max={trip.end_date} defaultValue={visit?.visited_on ?? trip.start_date} disabled={editingPlace} required /></label>
+          <label>Stop order<input type="number" name="position" min="1" defaultValue={visit?.position ?? nextPosition} disabled={editingPlace} required /></label>
+        </div>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="actions">
-        <button className="button primary" disabled={busy}>{busy ? 'Saving…' : 'Save stop'}</button>
-        {onCancel && <button type="button" className="button quiet" onClick={onCancel}>Cancel</button>}
+        <button className="button primary" disabled={busy}>{busy ? 'Saving…' : editingPlace ? 'Save place' : 'Save stop'}</button>
+        {(editingPlace || onCancel) && <button type="button" className="button quiet" disabled={busy} onClick={editingPlace ? cancelPlaceEdit : onCancel}>Cancel</button>}
       </div>
     </form>
   )
