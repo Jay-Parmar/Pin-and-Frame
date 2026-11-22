@@ -12,6 +12,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "rest_framework",
     "catalog",
+    "imports.apps.ImportsConfig",
 ]
 
 MIDDLEWARE = [
