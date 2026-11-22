@@ -127,7 +127,7 @@ class MapFilters(serializers.Serializer):
     year = serializers.IntegerField(required=False, min_value=1, max_value=9999)
 
 
-class GalleryFilters(serializers.Serializer):
+class GalleryFilters(MapFilters):
     visit = serializers.UUIDField(required=False)
 
 

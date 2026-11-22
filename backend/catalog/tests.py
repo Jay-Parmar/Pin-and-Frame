@@ -135,6 +135,12 @@ class CatalogTests(TestCase):
 
         gallery_path = f"/api/v1/places/{self.place.id}/photos/"
         self.assertEqual(self.api.get(gallery_path).json()["count"], 2)
+        for filters in ({"year": 2025}, {"trip": self.trip.id}):
+            with self.subTest(filters=filters):
+                scoped = self.api.get(gallery_path, filters).json()
+                self.assertEqual([item["id"] for item in scoped["results"]], [str(self.photo.id)])
+        excluded = self.api.get(gallery_path, {"year": 2026, "visit": self.visit.id}).json()
+        self.assertEqual(excluded["count"], 0)
         gallery = self.api.get(gallery_path, {"visit": self.visit.id}).json()
         self.assertEqual(gallery["count"], 1)
         photo = gallery["results"][0]

@@ -24,6 +24,17 @@ from catalog.serializers import (
 )
 
 
+def scoped_visits(filters):
+    visits = Visit.objects.all()
+    if "trip" in filters:
+        visits = visits.filter(trip_id=filters["trip"])
+    if "year" in filters:
+        visits = visits.filter(visited_on__year=filters["year"])
+    if "visit" in filters:
+        visits = visits.filter(pk=filters["visit"])
+    return visits
+
+
 class CatalogViewSet(viewsets.ModelViewSet):
     lookup_value_converter = "uuid"
 
@@ -77,11 +88,7 @@ class PlaceViewSet(CatalogViewSet):
     def map_places(self, request):
         filters = MapFilters(data=request.query_params)
         filters.is_valid(raise_exception=True)
-        visits = Visit.objects.all()
-        if "trip" in filters.validated_data:
-            visits = visits.filter(trip_id=filters.validated_data["trip"])
-        if "year" in filters.validated_data:
-            visits = visits.filter(visited_on__year=filters.validated_data["year"])
+        visits = scoped_visits(filters.validated_data)
         places = (
             visits.order_by("place__name", "place_id")
             .values("place_id", "place__name", "place__latitude", "place__longitude")
@@ -98,9 +105,8 @@ class PlaceViewSet(CatalogViewSet):
         place = self.get_object()
         filters = GalleryFilters(data=request.query_params)
         filters.is_valid(raise_exception=True)
-        photos = Photo.objects.filter(visit__place=place, state=Photo.State.APPROVED)
-        if "visit" in filters.validated_data:
-            photos = photos.filter(visit_id=filters.validated_data["visit"])
+        visits = scoped_visits(filters.validated_data).filter(place=place)
+        photos = Photo.objects.filter(visit__in=visits, state=Photo.State.APPROVED)
         page = self.paginate_queryset(photos)
         return self.get_paginated_response(PhotoSerializer(page, many=True).data)
 

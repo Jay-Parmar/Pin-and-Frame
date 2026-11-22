@@ -23,6 +23,7 @@ function tripYears(trips: Trip[]) {
 
 interface GalleryProps {
   place: Pin
+  scope: string
   visits: Visit[]
   visitId: string | null
   page: number
@@ -31,8 +32,9 @@ interface GalleryProps {
   onClose: () => void
 }
 
-function Gallery({ place, visits, visitId, page, onVisit, onPage, onClose }: GalleryProps) {
-  const query = new URLSearchParams({ page: String(page) })
+function Gallery({ place, scope, visits, visitId, page, onVisit, onPage, onClose }: GalleryProps) {
+  const query = new URLSearchParams(scope)
+  query.set('page', String(page))
   if (visitId) query.set('visit', visitId)
   const gallery = useApi<PageResult<Photo>>(`places/${place.id}/photos/?${query}`)
   const [preview, setPreview] = useState<string | null>(null)
@@ -52,7 +54,7 @@ function Gallery({ place, visits, visitId, page, onVisit, onPage, onClose }: Gal
       {visits.length > 0 && (
         <label className="gallery-filter">Show photos from
           <select value={visitId ?? ''} onChange={(event) => onVisit(event.target.value || null)}>
-            <option value="">All visits</option>
+            <option value="">{scope ? 'All stops in this view' : 'All visits'}</option>
             {visits.map((visit) => <option value={visit.id} key={visit.id}>Stop {visit.position} · {formatDate(visit.visited_on)}</option>)}
           </select>
         </label>
@@ -187,7 +189,9 @@ export function ArchivePage({ params, change }: { params: URLSearchParams; chang
             <div className="place-directory">
               {pins.loading && <p role="status" className="muted">Loading places…</p>}
               {pins.error && <p role="alert" className="error">{pins.error}</p>}
-              {pins.data?.length === 0 && <p className="muted">Add a stop to a trip to place a pin on the map.</p>}
+              {pins.data?.length === 0 && (
+                <p className="muted">{tripId || year ? 'No places in this view.' : 'Add a stop to a trip to place a pin on the map.'}</p>
+              )}
               {pins.data && pins.data.length > 0 && (
                 <ul className="place-list" aria-label="Places">
                   {pins.data.map((pin) => (
@@ -205,6 +209,7 @@ export function ArchivePage({ params, change }: { params: URLSearchParams; chang
             <Gallery
               key={`${activePlace.id}:${visitId ?? ''}:${page}`}
               place={activePlace}
+              scope={pinQuery.toString()}
               visits={placeVisits}
               visitId={visitId}
               page={page}
