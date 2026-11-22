@@ -55,6 +55,16 @@ class TakeoutTests(TestCase):
         (item,) = takeout_items(self.root)
         self.assertEqual(item.longitude, 2)
 
+    def test_does_not_apply_one_sidecar_to_colliding_photos_in_the_same_album(self):
+        local = "part-1/Takeout/Google Photos/Album"
+        split = "part-2/Takeout/Google Photos/Album"
+        self.photo(local, "photo.jpg")
+        self.photo(split, "photo.jpg")
+        self.sidecar(local, "photo.jpg.supplemental-metadata.json", "photo.jpg", 4)
+        items = list(takeout_items(self.root))
+        self.assertEqual([item.longitude for item in items if item.longitude is not None], [4])
+        self.assertEqual(sum(bool(item.issue) for item in items), 1)
+
     def test_ambiguous_title_leaves_file_metadata_as_fallback(self):
         self.photo("Photos", "photo.jpg")
         self.sidecar("Album A", "truncated.json", "photo.jpg", 2)

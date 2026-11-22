@@ -61,7 +61,7 @@ def sidecar_index(paths, root):
     return filenames, titles
 
 
-def matching_sidecar(path, root, photo_counts, filenames, titles):
+def matching_sidecar(path, root, photo_counts, album_counts, filenames, titles):
     name = path.name.casefold()
     exact = filenames[name]
     titled = titles[name]
@@ -69,9 +69,12 @@ def matching_sidecar(path, root, photo_counts, filenames, titles):
     groups = [
         [entry for entry in exact if entry.path.parent == path.parent],
         [entry for entry in titled if entry.path.parent == path.parent],
-        [entry for entry in exact if album_path(entry.path, root) == album],
-        [entry for entry in titled if album_path(entry.path, root) == album],
     ]
+    if album_counts[album, name] == 1:
+        groups.extend((
+            [entry for entry in exact if album_path(entry.path, root) == album],
+            [entry for entry in titled if album_path(entry.path, root) == album],
+        ))
     if photo_counts[name] == 1:
         groups.extend((exact, titled))
     for matches in groups:
@@ -103,13 +106,14 @@ def takeout_items(root):
         elif path.suffix.lower() == ".json":
             sidecars.append(path)
     photo_counts = Counter(path.name.casefold() for path in photos)
+    album_counts = Counter((album_path(path, root), path.name.casefold()) for path in photos)
     filenames, titles = sidecar_index(sidecars, root)
     for path in photos:
         resolved = contained_file(root, path)
         if resolved is None:
             yield SourceImage(path.name, issue="File is unavailable in the source folder.")
             continue
-        metadata, issue = matching_sidecar(path, root, photo_counts, filenames, titles)
+        metadata, issue = matching_sidecar(path, root, photo_counts, album_counts, filenames, titles)
         taken = metadata.get("photoTakenTime")
         timestamp = taken.get("timestamp") if isinstance(taken, dict) else None
         captured_at = unix_timestamp(timestamp)
