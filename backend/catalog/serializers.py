@@ -46,17 +46,38 @@ class VisitSerializer(serializers.ModelSerializer):
     class Meta:
         model = Visit
         fields = ["id", "trip", "place", "visited_on", "position"]
+        validators = []
 
     def validate(self, attrs):
         if self.instance:
-            trip = attrs.get("trip", self.instance.trip)
+            source_trip_id = self.instance.trip_id
+            trip_id = attrs["trip"].pk if "trip" in attrs else source_trip_id
             day = attrs.get("visited_on", self.instance.visited_on)
+            position = attrs.get("position", self.instance.position)
         else:
-            trip, day = attrs["trip"], attrs["visited_on"]
+            trip_id = source_trip_id = attrs["trip"].pk
+            day, position = attrs["visited_on"], attrs["position"]
+
+        trips = {
+            trip.pk: trip
+            for trip in Trip.objects.filter(pk__in={source_trip_id, trip_id})
+            .order_by("pk")
+            .select_for_update()
+        }
+        trip = trips.get(trip_id)
+        if trip is None:
+            raise serializers.ValidationError({"trip": "Choose an existing trip."})
 
         if not trip.start_date <= day <= trip.end_date:
             raise serializers.ValidationError(
                 {"visited_on": "Use a date within the trip."}
+            )
+        matching = Visit.objects.filter(trip=trip, position=position)
+        if self.instance:
+            matching = matching.exclude(pk=self.instance.pk)
+        if matching.exists():
+            raise serializers.ValidationError(
+                {"position": "This position is already in use."}
             )
         return attrs
 

@@ -1,6 +1,7 @@
 from datetime import date
 
 from django.core.files.storage import default_storage
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.db.models.deletion import ProtectedError
 from django.http import FileResponse
@@ -47,6 +48,8 @@ class TripViewSet(CatalogViewSet):
 
     def get_queryset(self):
         trips = super().get_queryset()
+        if self.action in {"update", "partial_update"}:
+            return trips.select_for_update()
         if self.action == "retrieve":
             return trips.prefetch_related(
                 Prefetch("visits", queryset=Visit.objects.select_related("place"))
@@ -60,6 +63,10 @@ class TripViewSet(CatalogViewSet):
                     start_date__lte=date(year, 12, 31), end_date__gte=date(year, 1, 1)
                 )
         return trips
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
 
 
 class PlaceViewSet(CatalogViewSet):
@@ -101,6 +108,20 @@ class PlaceViewSet(CatalogViewSet):
 class VisitViewSet(CatalogViewSet):
     serializer_class = VisitSerializer
     queryset = Visit.objects.select_related("trip", "place")
+
+    def get_queryset(self):
+        visits = super().get_queryset()
+        if self.action in {"update", "partial_update"}:
+            return visits.select_for_update(of=("self",))
+        return visits
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        return super().create(request, *args, **kwargs)
+
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
 
 
 @api_view(["GET"])
