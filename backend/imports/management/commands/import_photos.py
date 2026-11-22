@@ -8,9 +8,10 @@ from catalog.models import Trip
 from imports.ingest import import_photos
 from imports.models import ImportItem, ImportRun
 from imports.sources import SourceError, device_items
+from imports.takeout import takeout_items
 
 
-SOURCES = {ImportRun.Source.DEVICE: device_items}
+SOURCES = {ImportRun.Source.DEVICE: device_items, ImportRun.Source.TAKEOUT: takeout_items}
 
 
 class Command(BaseCommand):
