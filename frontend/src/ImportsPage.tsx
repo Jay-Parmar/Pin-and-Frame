@@ -26,11 +26,14 @@ interface ImportItem {
   name: string
   result: string
   issue: string
+  captured_on: string | null
+  captured_at: string | null
   latitude: number | null
   longitude: number | null
   published_at: string | null
   photo: Photo | null
   suggested_visit: string | null
+  suggestion_reason: string | null
 }
 
 const reviewStates = ['pending', 'approved', 'ignored', 'failed', 'skipped', 'all'] as const
@@ -80,6 +83,8 @@ function ReviewItems({
       if (state === 'approved' && dateMode !== 'keep') body.captured_on = dateMode === 'clear' ? null : date
       const response = await api<{ updated: number }>('imports/review/', { method: 'POST', body })
       setSelected(new Set())
+      setDateMode('keep')
+      setDate('')
       onUpdate(`${response.updated} ${response.updated === 1 ? 'photo' : 'photos'} updated.`)
     } catch (error) {
       setError(messageFor(error))
@@ -130,6 +135,8 @@ function ReviewItems({
       <ul className="review-list">
         {results.map((item) => {
           const photo = item.photo
+          const sourceDate = item.captured_on ?? item.captured_at?.slice(0, 10)
+          const photoCaptureDate = photo?.captured_on ?? photo?.captured_at?.slice(0, 10)
           const suggestion = trip.visits.find((visit) => visit.id === item.suggested_visit)
           const hint = item.latitude === null || item.longitude === null ? undefined : { latitude: item.latitude, longitude: item.longitude }
           return (
@@ -142,14 +149,20 @@ function ReviewItems({
               <div className="review-description">
                 <strong>{item.name}</strong>
                 {photo && <p className="muted">{photoDate(photo)} · {photo.state}</p>}
+                {sourceDate && sourceDate !== photoCaptureDate && (
+                  <p className="muted">Source capture date {formatDate(sourceDate)}</p>
+                )}
                 {item.published_at && <p className="muted">Posted {formatDate(item.published_at)}</p>}
                 {item.issue && <p className="muted">{item.issue}</p>}
                 {hint && <p className="muted">GPS {hint.latitude.toFixed(4)}, {hint.longitude.toFixed(4)}</p>}
                 {suggestion && (
-                  <button type="button" className="button quiet" disabled={busy} onClick={() => {
-                    if (photo) setSelected(new Set([photo.id]))
-                    setVisitId(suggestion.id)
-                  }}>Use {suggestion.place.name}</button>
+                  <>
+                    {item.suggestion_reason && <p className="muted">Suggested by {item.suggestion_reason}</p>}
+                    <button type="button" className="button quiet" disabled={busy} onClick={() => {
+                      if (photo) setSelected(new Set([photo.id]))
+                      setVisitId(suggestion.id)
+                    }}>Use {suggestion.place.name}</button>
+                  </>
                 )}
                 {hint && !suggestion && <button type="button" className="button quiet" onClick={() => setNewStop({ hint })}>Add stop at GPS</button>}
               </div>
