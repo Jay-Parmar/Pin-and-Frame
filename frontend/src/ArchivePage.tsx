@@ -13,6 +13,12 @@ const TravelMap = lazy(() => import('./TravelMap'))
 const emptyPins: Pin[] = []
 const emptyVisits: Visit[] = []
 
+function scrollToGallery(element: HTMLElement | null) {
+  if (window.matchMedia('(max-width: 860px)').matches) {
+    element?.scrollIntoView({ block: 'start' })
+  }
+}
+
 function tripYears(trips: Trip[]) {
   const years = new Set<string>()
   for (const trip of trips) {
@@ -202,13 +208,12 @@ export function ArchivePage({ params, change }: { params: URLSearchParams; chang
   useEffect(() => {
     if (!activePlace || !revealGallery.current) return
     revealGallery.current = false
-    if (window.matchMedia('(max-width: 860px)').matches) {
-      galleryAnchor.current?.scrollIntoView({ block: 'start' })
-    }
+    scrollToGallery(galleryAnchor.current)
   }, [activePlace, visitId])
 
   function choosePlace(id: string, visit: string | null = null) {
-    revealGallery.current = true
+    if (id === placeId && visit === visitId) scrollToGallery(galleryAnchor.current)
+    else revealGallery.current = true
     change({ place: id, visit, page: null })
   }
 
